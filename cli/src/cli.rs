@@ -401,7 +401,7 @@ pub enum WalletCommands {
         #[arg(short = 'n', long)]
         name: Option<String>,
         /// Wallet type (evm or solana)
-        #[arg(short = 't', long, value_enum)]
+        #[arg(short = 't', long = "type", value_enum)]
         wallet_type: Option<WalletType>,
         /// Private key to import (hex for EVM, base58 for Solana)
         #[arg(short = 'k', long)]

@@ -118,7 +118,7 @@ purl wallet <COMMAND>
 | Option | Description |
 |--------|-------------|
 | `-n, --name <NAME>` | Name for the wallet |
-| `-t, --wallet-type <TYPE>` | Wallet type: evm or solana |
+| `-t, --type <TYPE>` | Wallet type: evm or solana |
 | `-k, --private-key <KEY>` | Private key to import (hex for EVM, base58 for Solana) |
 
 ## Config Commands

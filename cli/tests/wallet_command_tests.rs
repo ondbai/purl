@@ -205,7 +205,7 @@ fn test_wallet_create_alias_help() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Create a new wallet"))
-        .stdout(predicate::str::contains("--wallet-type"))
+        .stdout(predicate::str::contains("--type"))
         .stdout(predicate::str::contains("--private-key"));
 }
 
@@ -217,7 +217,7 @@ fn test_wallet_add_help() {
         .success()
         .stdout(predicate::str::contains("Create a new wallet"))
         .stdout(predicate::str::contains("--name"))
-        .stdout(predicate::str::contains("--wallet-type"))
+        .stdout(predicate::str::contains("--type"))
         .stdout(predicate::str::contains("--private-key"));
 }
 
