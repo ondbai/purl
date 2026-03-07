@@ -11,6 +11,9 @@ use purl_lib::keystore::{create_keystore, create_solana_keystore, list_keystores
 use purl_lib::Config;
 use solana_sdk::signature::{Keypair, Signer};
 use std::path::PathBuf;
+use std::time::SystemTime;
+use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
 
 /// Create a clickable address link with shortened display text
 fn short_address_link(address: &str, chain_type: &str) -> String {
@@ -32,6 +35,10 @@ fn short_address_link(address: &str, chain_type: &str) -> String {
     } else {
         short
     }
+}
+
+fn format_metadata_time(time: SystemTime) -> Option<String> {
+    OffsetDateTime::from(time).format(&Rfc3339).ok()
 }
 
 /// List all available wallets in the wallets directory
@@ -537,21 +544,14 @@ pub fn show_command(name: &str) -> Result<()> {
 
     if let Ok(metadata) = std::fs::metadata(&keystore_path) {
         if let Ok(created) = metadata.created() {
-            if let Ok(datetime) = created.duration_since(std::time::UNIX_EPOCH) {
-                let secs = datetime.as_secs();
-                // Simple date formatting (YYYY-MM-DD HH:MM:SS)
-                use std::time::SystemTime;
-                let system_time = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(secs);
-                println!("  Created: {system_time:?}");
+            if let Some(formatted) = format_metadata_time(created) {
+                println!("  Created: {formatted}");
             }
         }
 
         if let Ok(modified) = metadata.modified() {
-            if let Ok(datetime) = modified.duration_since(std::time::UNIX_EPOCH) {
-                let secs = datetime.as_secs();
-                use std::time::SystemTime;
-                let system_time = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(secs);
-                println!("  Modified: {system_time:?}");
+            if let Some(formatted) = format_metadata_time(modified) {
+                println!("  Modified: {formatted}");
             }
         }
 

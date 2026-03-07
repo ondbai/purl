@@ -129,6 +129,23 @@ fn test_wallet_show_displays_encryption_info() {
 
 #[test]
 #[serial]
+fn test_wallet_show_displays_rfc3339_timestamps() {
+    let temp = tempfile::TempDir::new().unwrap();
+
+    let _keystore_path =
+        common::create_test_keystore(&temp, "test-wallet", VALID_EVM_KEY, "test-password");
+
+    test_command(&temp)
+        .args(["wallet", "show", "test-wallet"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_match(r"Created: \d{4}-\d{2}-\d{2}T").unwrap())
+        .stdout(predicate::str::is_match(r"Modified: \d{4}-\d{2}-\d{2}T").unwrap())
+        .stdout(predicate::str::contains("SystemTime {").not());
+}
+
+#[test]
+#[serial]
 fn test_wallet_show_name_without_json_extension() {
     let temp = tempfile::TempDir::new().unwrap();
 
