@@ -193,12 +193,11 @@ fn format_payment_amount(requirement: &PaymentRequirements) -> (String, String) 
 
 /// Get the sender address from config
 fn get_sender_address(config: &Config, requirement: &PaymentRequirements) -> Option<String> {
-    use purl_lib::WalletConfig;
-
     // Determine chain type from network
     if purl_lib::network::is_evm_network(requirement.network()) {
-        config.evm.as_ref().and_then(|evm| evm.get_address().ok())
+        config.evm_address().ok()
     } else if purl_lib::network::is_solana_network(requirement.network()) {
+        use purl_lib::WalletConfig;
         config
             .solana
             .as_ref()
