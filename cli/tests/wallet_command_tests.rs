@@ -298,6 +298,7 @@ fn test_wallet_list_displays_address_if_available() {
         .args(["wallet", "list"])
         .assert()
         .success()
+        .stdout(predicate::str::contains("\u{1b}]8;;").not())
         .stdout(predicate::str::contains(
             "0x1234567890abcdef1234567890abcdef12345678",
         ));
@@ -379,5 +380,6 @@ fn test_wallet_show_with_color_options() {
     test_command(&temp)
         .args(["wallet", "show", "test-wallet", "--color", "never"])
         .assert()
-        .success();
+        .success()
+        .stdout(predicate::str::contains("\u{1b}]8;;").not());
 }

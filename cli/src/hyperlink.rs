@@ -3,6 +3,9 @@
 //! Modern terminals support clickable hyperlinks via the OSC 8 standard.
 //! Terminals that don't support it will simply show the visible text.
 
+use colored::control::SHOULD_COLORIZE;
+use std::io::IsTerminal;
+
 /// Format a clickable hyperlink for terminals that support OSC 8.
 ///
 /// The format is: `\x1B]8;;URL\x07TEXT\x1B]8;;\x07`
@@ -13,13 +16,33 @@ pub fn hyperlink(url: &str, text: &str) -> String {
     format!("\x1B]8;;{}\x07{}\x1B]8;;\x07", url, text)
 }
 
+/// Format a clickable hyperlink only when terminal decoration is appropriate.
+///
+/// Hyperlinks are suppressed for non-TTY output and when color/terminal decoration
+/// has been disabled via the existing color control path.
+pub fn supports_hyperlinks() -> bool {
+    std::io::stdout().is_terminal() && SHOULD_COLORIZE.should_colorize()
+}
+
+/// Format a clickable hyperlink only when terminal decoration is appropriate.
+///
+/// Hyperlinks are suppressed for non-TTY output and when color/terminal decoration
+/// has been disabled via the existing color control path.
+pub fn terminal_hyperlink(url: &str, text: &str) -> String {
+    if supports_hyperlinks() {
+        hyperlink(url, text)
+    } else {
+        text.to_string()
+    }
+}
+
 /// Format a transaction hash as a hyperlink if network supports it.
 ///
 /// Returns plain text if the network is unknown or has no explorer configured.
 pub fn tx_link(tx_hash: &str, network: &str) -> String {
     if let Some(info) = purl_lib::network::get_network(network) {
         if let Some(url) = info.tx_url(tx_hash) {
-            return hyperlink(&url, tx_hash);
+            return terminal_hyperlink(&url, tx_hash);
         }
     }
     tx_hash.to_string()
@@ -31,7 +54,7 @@ pub fn tx_link(tx_hash: &str, network: &str) -> String {
 pub fn address_link(address: &str, network: &str) -> String {
     if let Some(info) = purl_lib::network::get_network(network) {
         if let Some(url) = info.address_url(address) {
-            return hyperlink(&url, address);
+            return terminal_hyperlink(&url, address);
         }
     }
     address.to_string()
@@ -63,17 +86,44 @@ mod tests {
     }
 
     #[test]
-    fn test_tx_link_known_network() {
-        let link = tx_link("0x123abc", "base");
-        assert!(link.contains("basescan.org"));
-        assert!(link.contains("/tx/0x123abc"));
+    fn test_terminal_hyperlink_plain_text_when_not_tty() {
+        let link = terminal_hyperlink("https://example.com", "click me");
+        assert_eq!(link, "click me");
     }
 
     #[test]
-    fn test_address_link_known_network() {
+    fn test_supports_hyperlinks_false_when_not_tty() {
+        assert!(!supports_hyperlinks());
+    }
+
+    #[test]
+    fn test_tx_link_known_network_plain_text_when_not_tty() {
+        let link = tx_link("0x123abc", "base");
+        assert_eq!(link, "0x123abc");
+    }
+
+    #[test]
+    fn test_tx_url_lookup_known_network() {
+        let url = purl_lib::network::get_network("base")
+            .and_then(|n| n.tx_url("0x123abc"))
+            .expect("base tx url");
+        assert!(url.contains("basescan.org"));
+        assert!(url.contains("/tx/0x123abc"));
+    }
+
+    #[test]
+    fn test_address_link_known_network_plain_text_when_not_tty() {
         let link = address_link("0xabcdef", "ethereum");
-        assert!(link.contains("etherscan.io"));
-        assert!(link.contains("/address/0xabcdef"));
+        assert_eq!(link, "0xabcdef");
+    }
+
+    #[test]
+    fn test_address_url_lookup_known_network() {
+        let url = purl_lib::network::get_network("ethereum")
+            .and_then(|n| n.address_url("0xabcdef"))
+            .expect("ethereum address url");
+        assert!(url.contains("etherscan.io"));
+        assert!(url.contains("/address/0xabcdef"));
     }
 
     #[test]
@@ -83,24 +133,48 @@ mod tests {
     }
 
     #[test]
-    fn test_solana_address_link() {
+    fn test_solana_address_link_plain_text_when_not_tty() {
         let link = address_link("5xyzABC", "solana");
-        assert!(link.contains("solscan.io"));
-        assert!(link.contains("/account/5xyzABC"));
+        assert_eq!(link, "5xyzABC");
     }
 
     #[test]
-    fn test_wallet_link_evm() {
+    fn test_solana_address_url_lookup() {
+        let url = purl_lib::network::get_network("solana")
+            .and_then(|n| n.address_url("5xyzABC"))
+            .expect("solana address url");
+        assert!(url.contains("solscan.io"));
+        assert!(url.contains("/account/5xyzABC"));
+    }
+
+    #[test]
+    fn test_wallet_link_evm_plain_text_when_not_tty() {
         let link = wallet_link("0xabcdef123456", "EVM");
-        assert!(link.contains("basescan.org"));
-        assert!(link.contains("/address/0xabcdef123456"));
+        assert_eq!(link, "0xabcdef123456");
     }
 
     #[test]
-    fn test_wallet_link_solana() {
+    fn test_wallet_link_evm_uses_base_url_lookup() {
+        let url = purl_lib::network::get_network("base")
+            .and_then(|n| n.address_url("0xabcdef123456"))
+            .expect("base address url");
+        assert!(url.contains("basescan.org"));
+        assert!(url.contains("/address/0xabcdef123456"));
+    }
+
+    #[test]
+    fn test_wallet_link_solana_plain_text_when_not_tty() {
         let link = wallet_link("5xyzABC", "Solana");
-        assert!(link.contains("solscan.io"));
-        assert!(link.contains("/account/5xyzABC"));
+        assert_eq!(link, "5xyzABC");
+    }
+
+    #[test]
+    fn test_wallet_link_solana_uses_solana_url_lookup() {
+        let url = purl_lib::network::get_network("solana")
+            .and_then(|n| n.address_url("5xyzABC"))
+            .expect("solana wallet url");
+        assert!(url.contains("solscan.io"));
+        assert!(url.contains("/account/5xyzABC"));
     }
 
     #[test]

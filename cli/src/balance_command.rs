@@ -12,6 +12,29 @@ use std::io::{IsTerminal, Write};
 use std::sync::{Arc, Mutex};
 use tokio::time::{interval, Duration};
 
+fn wallet_display(chain: &str, addr: &str, short_addr: &str) -> String {
+    let linked_addr = wallet_link(addr, chain);
+
+    if linked_addr != addr {
+        if crate::hyperlink::supports_hyperlinks() {
+            crate::hyperlink::terminal_hyperlink(
+                &purl_lib::network::get_network(match chain {
+                    "EVM" => "base",
+                    "Solana" => "solana",
+                    _ => "",
+                })
+                .and_then(|n| n.address_url(addr))
+                .unwrap_or_default(),
+                short_addr,
+            )
+        } else {
+            addr.to_string()
+        }
+    } else {
+        addr.to_string()
+    }
+}
+
 /// Check token balances for configured networks
 pub async fn balance_command(
     config: &Config,
@@ -54,23 +77,7 @@ pub async fn balance_command(
         if !wallet_info.is_empty() {
             println!("{}", "Wallet".green().bold());
             for (chain, addr, short_addr) in &wallet_info {
-                let linked_addr = wallet_link(addr, chain);
-                // Create display with short address as the visible text but full address in the link
-                let display = if linked_addr != *addr {
-                    // Has a link - create hyperlink with short display text
-                    crate::hyperlink::hyperlink(
-                        &purl_lib::network::get_network(match *chain {
-                            "EVM" => "base",
-                            "Solana" => "solana",
-                            _ => "",
-                        })
-                        .and_then(|n| n.address_url(addr))
-                        .unwrap_or_default(),
-                        short_addr,
-                    )
-                } else {
-                    short_addr.clone()
-                };
+                let display = wallet_display(chain, addr, short_addr);
                 println!("  {} {}", display.yellow(), format!("({})", chain).dimmed());
             }
             println!();
@@ -352,6 +359,17 @@ mod tests {
         assert_eq!(usdc.format_atomic(1), "0.000001");
         assert_eq!(usdc.format_atomic(0), "0.000000");
         assert_eq!(usdc.format_atomic(1_500_000), "1.500000");
+    }
+
+    #[test]
+    fn wallet_display_returns_full_address_when_hyperlinks_are_disabled() {
+        let addr = "0x1234567890abcdef1234567890abcdef12345678";
+        let short = "0x1234...5678";
+
+        let display = wallet_display("EVM", addr, short);
+
+        assert_eq!(display, addr);
+        assert!(!display.contains("\x1B]8;;"));
     }
 
     #[test]

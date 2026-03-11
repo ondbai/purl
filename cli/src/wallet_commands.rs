@@ -2,7 +2,7 @@
 
 use crate::cli::WalletType;
 use crate::colors::Colors;
-use crate::hyperlink::{hyperlink, wallet_link};
+use crate::hyperlink::{supports_hyperlinks, terminal_hyperlink, wallet_link};
 use crate::table::Table;
 use anyhow::{Context, Result};
 use colored::Colorize;
@@ -31,9 +31,13 @@ fn short_address_link(address: &str, chain_type: &str) -> String {
 
     if let Some(url) = purl_lib::network::get_network(network).and_then(|n| n.address_url(address))
     {
-        hyperlink(&url, &short)
+        if supports_hyperlinks() {
+            terminal_hyperlink(&url, &short)
+        } else {
+            address.to_string()
+        }
     } else {
-        short
+        address.to_string()
     }
 }
 

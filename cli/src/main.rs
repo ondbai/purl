@@ -288,9 +288,13 @@ async fn show_status_and_help() {
                 let linked_short = if let Some(url) =
                     purl_lib::network::get_network("base").and_then(|n| n.address_url(&address))
                 {
-                    hyperlink::hyperlink(&url, &short_addr)
+                    if hyperlink::supports_hyperlinks() {
+                        hyperlink::terminal_hyperlink(&url, &short_addr)
+                    } else {
+                        address.clone()
+                    }
                 } else {
-                    short_addr.clone()
+                    address.clone()
                 };
                 wallet_info.push(("EVM", address, short_addr, linked_short));
             }
@@ -307,9 +311,13 @@ async fn show_status_and_help() {
                 let linked_short = if let Some(url) =
                     purl_lib::network::get_network("solana").and_then(|n| n.address_url(&pubkey))
                 {
-                    hyperlink::hyperlink(&url, &short_key)
+                    if hyperlink::supports_hyperlinks() {
+                        hyperlink::terminal_hyperlink(&url, &short_key)
+                    } else {
+                        pubkey.clone()
+                    }
                 } else {
-                    short_key.clone()
+                    pubkey.clone()
                 };
                 wallet_info.push(("Solana", pubkey, short_key, linked_short));
             }

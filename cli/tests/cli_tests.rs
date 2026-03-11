@@ -86,6 +86,18 @@ fn test_wallet_alias() {
 }
 
 #[test]
+fn test_no_args_status_view_omits_osc8_hyperlinks_in_non_tty_output() {
+    let temp = setup_test_config(Some(VALID_EVM_KEY), None);
+
+    test_command(&temp)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Wallet"))
+        .stdout(predicate::str::contains("0x").or(predicate::str::contains("abcdef")))
+        .stdout(predicate::str::contains("\u{1b}]8;;").not());
+}
+
+#[test]
 fn test_quiet_flag() {
     let temp = setup_test_config(Some(VALID_EVM_KEY), None);
 
