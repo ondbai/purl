@@ -657,4 +657,52 @@ mod tests {
         assert_eq!(methods.len(), 1);
         assert!(methods.contains(&PaymentMethod::Solana));
     }
+
+    /// A known-valid 32-byte hex private key used across wallet-override tests.
+    const TEST_EVM_KEY: &str =
+        "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+
+    #[test]
+    fn test_available_payment_methods_with_private_key_override() {
+        let config = Config {
+            evm: None,
+            solana: None,
+            evm_private_key: Some(TEST_EVM_KEY.to_string()),
+            ..Default::default()
+        };
+        let methods = config.available_payment_methods();
+        assert_eq!(methods, vec![PaymentMethod::Evm]);
+    }
+
+    #[test]
+    fn test_validate_with_private_key_override() {
+        let config = Config {
+            evm: None,
+            evm_private_key: Some(TEST_EVM_KEY.to_string()),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_load_evm_signer_from_private_key() {
+        let config = Config {
+            evm: None,
+            evm_private_key: Some(TEST_EVM_KEY.to_string()),
+            ..Default::default()
+        };
+        assert!(config.load_evm_signer().is_ok());
+    }
+
+    #[test]
+    fn test_evm_address_from_private_key() {
+        let config = Config {
+            evm: None,
+            evm_private_key: Some(TEST_EVM_KEY.to_string()),
+            ..Default::default()
+        };
+        let address = config.evm_address().expect("should derive address");
+        assert!(address.starts_with("0x"));
+        assert_eq!(address.len(), 42);
+    }
 }
