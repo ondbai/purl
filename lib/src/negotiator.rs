@@ -336,4 +336,25 @@ mod tests {
         let selected = result.unwrap();
         assert_eq!(selected.network(), "eip155:8453");
     }
+
+    #[test]
+    fn test_negotiator_selects_requirement_with_private_key_override() {
+        let config = Config {
+            evm: None,
+            solana: None,
+            evm_private_key: Some(
+                "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890".to_string(),
+            ),
+            ..Default::default()
+        };
+        let requirements = make_test_v2_requirements();
+
+        let negotiator = PaymentNegotiator::new(&config);
+        let result = negotiator.select_from_requirements(&requirements);
+
+        assert!(result.is_ok(), "Expected Ok, got: {result:?}");
+        let selected = result.unwrap();
+        assert!(selected.is_evm());
+        assert_eq!(selected.network(), "eip155:8453");
+    }
 }

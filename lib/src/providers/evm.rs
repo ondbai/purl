@@ -247,3 +247,86 @@ impl PaymentProvider for EvmProvider {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::payment_provider::PaymentProvider;
+    use crate::x402::{v2, PaymentRequirements as UnifiedRequirements};
+
+    const TEST_EVM_KEY: &str = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+
+    fn make_test_requirements() -> UnifiedRequirements {
+        let req = v2::PaymentRequirements {
+            scheme: "exact".to_string(),
+            network: "eip155:84532".to_string(),
+            amount: "10000".to_string(),
+            asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e".to_string(),
+            pay_to: "0x1111111111111111111111111111111111111111".to_string(),
+            max_timeout_seconds: 60,
+            extra: Some(serde_json::json!({"name": "USD Coin", "version": "2"})),
+        };
+        let resource = v2::ResourceInfo {
+            url: "https://example.com/paid".to_string(),
+            description: Some("Test endpoint".to_string()),
+            mime_type: Some("application/json".to_string()),
+        };
+        UnifiedRequirements::V2 {
+            requirements: req,
+            resource_info: resource,
+        }
+    }
+
+    #[test]
+    fn test_dry_run_with_private_key_override() {
+        let config = Config {
+            evm: None,
+            evm_private_key: Some(TEST_EVM_KEY.to_string()),
+            ..Default::default()
+        };
+        let requirements = make_test_requirements();
+        let provider = EvmProvider::new();
+
+        let info = provider
+            .dry_run(&requirements, &config)
+            .expect("dry_run should succeed");
+
+        assert_eq!(info.provider, "EVM");
+        assert_eq!(info.network, "eip155:84532");
+        assert_eq!(info.amount, "10000");
+        assert_eq!(info.to, "0x1111111111111111111111111111111111111111");
+        assert!(info.from.starts_with("0x"));
+        assert_eq!(info.from.len(), 42);
+    }
+
+    #[test]
+    fn test_dry_run_with_keystore_override() {
+        let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+
+        // Point HOME at temp so create_keystore writes there
+        std::env::set_var("HOME", temp_dir.path());
+        let keystore_path =
+            crate::keystore::create_keystore(TEST_EVM_KEY, "test-password", "override-wallet")
+                .expect("create keystore");
+
+        let config = Config {
+            evm: Some(crate::config::EvmConfig {
+                keystore: Some(keystore_path),
+            }),
+            password: Some("test-password".to_string()),
+            ..Default::default()
+        };
+        let requirements = make_test_requirements();
+        let provider = EvmProvider::new();
+
+        let info = provider
+            .dry_run(&requirements, &config)
+            .expect("dry_run should succeed");
+
+        assert_eq!(info.provider, "EVM");
+        assert_eq!(info.network, "eip155:84532");
+        assert_eq!(info.amount, "10000");
+        assert!(info.from.starts_with("0x"));
+        assert_eq!(info.from.len(), 42);
+    }
+}

@@ -280,6 +280,7 @@ Examples:
   purl wallet add                      # Interactive wallet creation
   purl wallet add --type evm           # Skip type selection
   purl wallet add --type solana -k KEY # Import existing key
+  purl wallet add --type evm -k KEY --password pass --set-active  # Non-interactive
   purl wallet list                     # List all wallets
   purl wallet use my-wallet            # Switch active wallet
   purl wallet verify my-wallet         # Check wallet integrity
@@ -406,6 +407,12 @@ pub enum WalletCommands {
         /// Private key to import (hex for EVM, base58 for Solana)
         #[arg(short = 'k', long)]
         private_key: Option<String>,
+        /// Password for keystore encryption (skips interactive prompt)
+        #[arg(short = 'p', long)]
+        password: Option<String>,
+        /// Set as active wallet without prompting (use --set-active=false to skip)
+        #[arg(long)]
+        set_active: Option<bool>,
     },
     /// Show wallet details
     Show {
@@ -416,6 +423,9 @@ pub enum WalletCommands {
     Verify {
         /// Name of the wallet (without .json extension)
         name: String,
+        /// Password for wallet decryption (skips interactive prompt)
+        #[arg(short = 'p', long)]
+        password: Option<String>,
     },
     /// Set a wallet as the active payment method
     Use {

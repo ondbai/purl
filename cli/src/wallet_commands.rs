@@ -236,6 +236,8 @@ pub fn add_command(
     name: Option<String>,
     wallet_type: Option<WalletType>,
     private_key: Option<String>,
+    password: Option<String>,
+    set_active: Option<bool>,
 ) -> Result<()> {
     // Step 1: Select wallet type
     let wallet_type = if let Some(t) = wallet_type {
@@ -367,10 +369,14 @@ pub fn add_command(
     };
 
     // Step 4: Password
-    let password = Password::new()
-        .with_prompt("Create password")
-        .with_confirmation("Confirm password", "Passwords do not match")
-        .interact()?;
+    let password = if let Some(p) = password {
+        p
+    } else {
+        Password::new()
+            .with_prompt("Create password")
+            .with_confirmation("Confirm password", "Passwords do not match")
+            .interact()?
+    };
 
     // Step 5: Wallet name
     let default_name = match wallet_type {
@@ -431,10 +437,14 @@ pub fn add_command(
     println!();
 
     // Step 8: Ask to set as active
-    let set_active = Confirm::new()
-        .with_prompt("Set as active wallet?")
-        .default(true)
-        .interact()?;
+    let set_active = if let Some(v) = set_active {
+        v
+    } else {
+        Confirm::new()
+            .with_prompt("Set as active wallet?")
+            .default(true)
+            .interact()?
+    };
 
     if set_active {
         match wallet_type {
@@ -621,7 +631,7 @@ pub fn show_command(name: &str) -> Result<()> {
 /// - The wallet format is invalid
 /// - The password is incorrect
 /// - The stored address doesn't match the derived address (indicating corruption)
-pub fn verify_command(name: &str) -> Result<()> {
+pub fn verify_command(name: &str, password: Option<String>) -> Result<()> {
     let keystore_path = find_keystore_by_name(name)?;
     let keystore = Keystore::load(&keystore_path)?;
 
@@ -629,13 +639,17 @@ pub fn verify_command(name: &str) -> Result<()> {
     println!();
 
     match keystore.content.get("chain").and_then(|v| v.as_str()) {
-        Some("solana") => verify_solana_wallet(&keystore, &keystore_path),
-        _ => verify_evm_wallet(&keystore),
+        Some("solana") => verify_solana_wallet(&keystore, &keystore_path, password),
+        _ => verify_evm_wallet(&keystore, password),
     }
 }
 
 /// Verify a Solana wallet
-fn verify_solana_wallet(keystore: &Keystore, keystore_path: &std::path::Path) -> Result<()> {
+fn verify_solana_wallet(
+    keystore: &Keystore,
+    keystore_path: &std::path::Path,
+    password: Option<String>,
+) -> Result<()> {
     // Validate format - Solana keystores should have crypto field
     if keystore.content.get("crypto").is_some() {
         println!("{} Wallet format is valid", "[OK]".green());
@@ -655,10 +669,14 @@ fn verify_solana_wallet(keystore: &Keystore, keystore_path: &std::path::Path) ->
         println!("{} Public key field missing", "[WARN]".yellow());
     }
 
-    let password = Password::new()
-        .with_prompt("Enter password to verify wallet integrity")
-        .allow_empty_password(false)
-        .interact()?;
+    let password = if let Some(p) = password {
+        p
+    } else {
+        Password::new()
+            .with_prompt("Enter password to verify wallet integrity")
+            .allow_empty_password(false)
+            .interact()?
+    };
 
     // Use Solana-specific decryption
     match purl_lib::keystore::decrypt_solana_keystore(keystore_path, Some(&password)) {
@@ -710,7 +728,7 @@ fn verify_solana_wallet(keystore: &Keystore, keystore_path: &std::path::Path) ->
 }
 
 /// Verify an EVM wallet
-fn verify_evm_wallet(keystore: &Keystore) -> Result<()> {
+fn verify_evm_wallet(keystore: &Keystore, password: Option<String>) -> Result<()> {
     match keystore.validate() {
         Ok(()) => {
             println!("{} Wallet format is valid", "[OK]".green());
@@ -727,10 +745,14 @@ fn verify_evm_wallet(keystore: &Keystore) -> Result<()> {
         println!("{} Address field missing", "[WARN]".yellow());
     }
 
-    let password = Password::new()
-        .with_prompt("Enter password to verify wallet integrity")
-        .allow_empty_password(false)
-        .interact()?;
+    let password = if let Some(p) = password {
+        p
+    } else {
+        Password::new()
+            .with_prompt("Enter password to verify wallet integrity")
+            .allow_empty_password(false)
+            .interact()?
+    };
 
     match keystore.decrypt(&password) {
         Ok(private_key_bytes) => {
