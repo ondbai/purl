@@ -26,6 +26,7 @@ use cli::{
 use colored::control;
 use exit_codes::ExitCode;
 use purl_lib::{Config, PaymentRequirementsResponse, WalletConfig};
+use serde_json::Value;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -161,6 +162,7 @@ async fn handle_command(cli: &Cli, command: &Commands) -> Result<()> {
 /// Make an HTTP request (main flow)
 async fn make_request(cli: Cli) -> Result<()> {
     let mut config = load_config(cli.config.as_ref())?;
+    apply_runtime_wallet_overrides(&mut config, &cli)?;
 
     // Set runtime password from CLI/env var for keystore decryption
     config.password = cli.password.clone();
@@ -493,6 +495,45 @@ fn show_config(cli: &Cli, output_format: OutputFormat, show_private_keys: bool) 
     Ok(())
 }
 
+fn apply_runtime_wallet_overrides(config: &mut Config, cli: &Cli) -> Result<()> {
+    if let Some(wallet_path) = &cli.wallet {
+        apply_wallet_path_override(config, wallet_path)?;
+    }
+
+    if let Some(private_key) = &cli.private_key {
+        config.evm_private_key = Some(private_key.clone());
+    }
+
+    config
+        .validate()
+        .context("Invalid runtime wallet configuration")?;
+    Ok(())
+}
+
+fn apply_wallet_path_override(config: &mut Config, wallet_path: &str) -> Result<()> {
+    let path = PathBuf::from(wallet_path);
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read wallet file: {}", path.display()))?;
+    let json: Value = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse wallet file: {}", path.display()))?;
+
+    if json["address"].is_string() {
+        let evm_config = config.evm.get_or_insert_with(Default::default);
+        evm_config.keystore = Some(path);
+        return Ok(());
+    }
+
+    if json["public_key"].is_string() || json["keypair"].is_string() {
+        let solana_config = config.solana.get_or_insert_with(Default::default);
+        solana_config.keystore = Some(path);
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "Cannot detect wallet type. Wallet must have 'address' (EVM) or 'public_key'/'keypair' (Solana) field."
+    );
+}
+
 // ==================== Simple Commands ====================
 
 /// Show version information
@@ -652,5 +693,24 @@ mod tests {
         // No wallets configured, so evm and solana should be null
         assert!(display.get("evm").unwrap().is_null());
         assert!(display.get("solana").unwrap().is_null());
+    }
+
+    #[test]
+    fn test_apply_runtime_wallet_overrides_sets_private_key() {
+        let mut config = Config::default();
+        let cli = Cli::parse_from([
+            "purl",
+            "--private-key",
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+            "https://example.com",
+        ]);
+
+        apply_runtime_wallet_overrides(&mut config, &cli)
+            .expect("Expected runtime private key override to be valid");
+
+        assert_eq!(
+            config.evm_private_key.as_deref(),
+            Some("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+        );
     }
 }

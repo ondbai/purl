@@ -2,6 +2,9 @@
 
 use crate::error::{PurlError, Result};
 use crate::network::ChainType;
+use crate::signer::load_private_key_signer;
+use crate::signer::WalletSource;
+use alloy_signer_local::PrivateKeySigner;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -47,6 +50,10 @@ pub struct Config {
     /// This is not persisted to the config file
     #[serde(skip)]
     pub password: Option<String>,
+    /// Runtime-only EVM private key override (from CLI flag)
+    /// This is not persisted to the config file
+    #[serde(skip)]
+    pub evm_private_key: Option<String>,
 }
 
 /// Custom network definition for extending built-in networks
@@ -268,6 +275,7 @@ impl ConfigBuilder {
             networks: self.networks,
             tokens: self.tokens,
             password: None,
+            evm_private_key: None,
         };
 
         // Validate the configuration
@@ -429,7 +437,7 @@ impl Config {
     /// Detect which payment method is available based on config
     pub fn available_payment_methods(&self) -> Vec<PaymentMethod> {
         let mut methods = Vec::new();
-        if self.evm.is_some() {
+        if self.evm.is_some() || self.evm_private_key.is_some() {
             methods.push(PaymentMethod::Evm);
         }
         if self.solana.is_some() {
@@ -442,6 +450,11 @@ impl Config {
     ///
     /// This validates that configured wallets have valid key material.
     pub fn validate(&self) -> Result<()> {
+        if let Some(private_key) = &self.evm_private_key {
+            load_private_key_signer(private_key)
+                .map(|_| ())
+                .map_err(|e| PurlError::ConfigMissing(format!("EVM configuration invalid: {e}")))?;
+        }
         if let Some(evm) = &self.evm {
             evm.validate()
                 .map_err(|e| PurlError::ConfigMissing(format!("EVM configuration invalid: {e}")))?;
@@ -474,6 +487,24 @@ impl Config {
                 "Solana configuration not found. Run 'purl wallet add' to configure.".to_string(),
             )
         })
+    }
+
+    /// Load an EVM signer from either a runtime private key or configured keystore.
+    pub fn load_evm_signer(&self) -> Result<PrivateKeySigner> {
+        if let Some(private_key) = &self.evm_private_key {
+            return load_private_key_signer(private_key);
+        }
+
+        self.require_evm()?.load_signer(self.password.as_deref())
+    }
+
+    /// Get the EVM address from either a runtime private key or configured keystore.
+    pub fn evm_address(&self) -> Result<String> {
+        if self.evm_private_key.is_some() {
+            return Ok(self.load_evm_signer()?.address().to_checksum(None));
+        }
+
+        self.require_evm()?.get_address()
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::config::{Config, WalletConfig};
+use crate::config::Config;
 use crate::currency::Currency;
 use crate::error::{PurlError, Result};
 use crate::network::{get_evm_chain_id, get_network, ChainType, Network};
@@ -54,9 +54,7 @@ impl EvmProvider {
     }
 
     fn load_signer(config: &Config) -> Result<PrivateKeySigner> {
-        use crate::signer::WalletSource;
-        let evm_config = config.require_evm()?;
-        evm_config.load_signer(config.password.as_deref())
+        config.load_evm_signer()
     }
 }
 
@@ -171,8 +169,6 @@ impl PaymentProvider for EvmProvider {
     }
 
     fn dry_run(&self, requirements: &PaymentRequirements, config: &Config) -> Result<DryRunInfo> {
-        let evm_config = config.require_evm()?;
-
         let amount = requirements.parse_max_amount().map_err(|_| {
             PurlError::InvalidAmount("The server provided an invalid payment amount.".to_string())
         })?;
@@ -182,14 +178,14 @@ impl PaymentProvider for EvmProvider {
             network: requirements.network().to_string(),
             amount: amount.to_string(),
             asset: requirements.asset().to_string(),
-            from: evm_config.get_address()?,
+            from: config.evm_address()?,
             to: requirements.pay_to().to_string(),
             estimated_fee: Some("0".to_string()), // EIP-3009 has no gas cost for sender
         })
     }
 
     fn get_address(&self, config: &Config) -> Result<String> {
-        config.require_evm()?.get_address()
+        config.evm_address()
     }
 
     async fn get_balance(
