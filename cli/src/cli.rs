@@ -103,6 +103,10 @@ pub struct Cli {
     #[arg(long, help_heading = "Payment Options")]
     pub dry_run: bool,
 
+    /// Auto-fund wallet via Tempo testnet faucet before paying
+    #[arg(long, help_heading = "Payment Options")]
+    pub fund: bool,
+
     // Display Options
     /// Verbosity level (can be used multiple times: -v, -vv, -vvv)
     #[arg(short = 'v', long = "verbosity", action = clap::ArgAction::Count, global = true, help_heading = "Display Options")]

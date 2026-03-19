@@ -46,3 +46,13 @@ rpassword = "7.4"
 tokio = { version = "1.49", features = ["full"] }
 async-trait = "0.1"
 sha3 = "0.10"
+
+[workspace.dependencies.mpp]
+git = "https://github.com/tempoxyz/mpp-rs"
+features = ["client", "tempo"]
+
+[workspace.dependencies.tempo-alloy]
+git = "https://github.com/tempoxyz/tempo"
+
+[workspace.dependencies.tempo-primitives]
+git = "https://github.com/tempoxyz/tempo"

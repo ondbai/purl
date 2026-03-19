@@ -10,6 +10,7 @@ mod exit_codes;
 mod help_topics;
 mod hyperlink;
 mod inspect_command;
+mod mpp_payment;
 mod network_commands;
 mod output;
 mod payment;
@@ -196,8 +197,23 @@ async fn make_request(cli: Cli) -> Result<()> {
         return Ok(());
     }
 
+    // Check if this is an MPP challenge (WWW-Authenticate: Payment header)
+    let is_mpp = response
+        .get_header("www-authenticate")
+        .is_some_and(|h| h.trim().starts_with("Payment ") || h.trim().starts_with("payment "));
+
+    if is_mpp {
+        if request_ctx.cli.is_verbose() && request_ctx.cli.should_show_output() {
+            eprintln!("402 status: payment required (MPP)");
+        }
+        let response =
+            crate::mpp_payment::handle_mpp_request(&config, &request_ctx, url).await?;
+        handle_regular_response(&request_ctx.cli, response)?;
+        return Ok(());
+    }
+
     if request_ctx.cli.is_verbose() && request_ctx.cli.should_show_output() {
-        eprintln!("402 status: payment required");
+        eprintln!("402 status: payment required (x402)");
     }
 
     let json = response.payment_requirements_json()?;
